@@ -1,20 +1,23 @@
-file_to_write=$1
-str_to_write=$2
+if [ -z "$1" ]
+then
+  echo "No path supplied"
+  exit 1
+fi
 
-if [ -z "$file_to_write" ]; then
-    echo "Error: file_to_write is not a file!"
+if [ -z "$2" ]
+  then
+    echo "No text supplied"
     exit 1
 fi
 
-if [ -z "$str_to_write" ]; then
-    echo "Error: str_to_write is not specified."
+mkdir -p `dirname $1`
+
+echo "$2" > "$1"
+result=$(cat "$1")
+
+if [ "$result" != "$2" ]
+  then
+    echo "Writing file failed"
     exit 1
 fi
 
-if [ -e "$file_to_write" ]; then
-    rm "$file_to_write"
-    echo "$str_to_write" > "$file_to_write"
-else
-    mkdir -p $(dirname "$file_to_write")
-    echo "$str_to_write" > "$file_to_write"
-fi

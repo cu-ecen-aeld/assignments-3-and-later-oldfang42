@@ -11,10 +11,12 @@ KERNEL_VERSION=v5.1.10
 BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
-CROSS_COMPILE=aarch64-none-linux-gnu-
+CROSS_COMPILER=aarch64-none-linux-gnu
+CROSS_COMPILE=${CROSS_COMPILER}-
 
 if [ $# -lt 1 ]
 then
+	# No arguments supplied
 	echo "Using default directory ${OUTDIR} for output"
 else
 	OUTDIR=$1
@@ -33,19 +35,28 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     cd linux-stable
     echo "Checking out version ${KERNEL_VERSION}"
     git checkout ${KERNEL_VERSION}
+	 
 
-    # TODO: Add your kernel build steps here
-    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper
-    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig
-    make -j8 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} all
-    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} dtbs
-    # copy all files generated to outdir
-    cp arch/${ARCH}/boot/Image ${OUTDIR}
-    # copy dtb files to outdir
+	 # deep clean the kernel tree
+	 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper
 
+	 # Configure the virtual arm dev board
+	 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig
+
+	 # Build the kernel image
+	 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} -j4 all
+
+	 # Build any kernel modules -> SKIPPED as per assignment instructions
+	 # make modules
+
+	 # Build the device tree
+	 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} dtbs
+
+	 
 fi
 
 echo "Adding the Image in outdir"
+cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}
 
 echo "Creating the staging directory for the root filesystem"
 cd "$OUTDIR"
@@ -55,11 +66,16 @@ then
     sudo rm  -rf ${OUTDIR}/rootfs
 fi
 
-# TODO: Create necessary base directories
-mkdir rootfs
-cd rootfs
-mkdir -p bin dev etc home lib lib64 proc sbin sys tmp usr var
-mkdir usr/bin usr/lib usr/sbin
+mkdir "rootfs"
+cd "${OUTDIR}/rootfs"
+
+# Creating root folders
+mkdir -p bin dev etc lib lib64 proc sbin sys tmp usr var
+# Creating root folders
+mkdir -p -m 777 home
+# Creating user folders
+mkdir -p usr/bin usr/lib usr/sbin
+# Creating runtime files folder
 mkdir -p var/log
 
 cd "$OUTDIR"
@@ -68,57 +84,68 @@ then
     git clone git://busybox.net/busybox.git
     cd busybox
     git checkout ${BUSYBOX_VERSION}
-    # TODO:  Configure busybox
-    make distclean
-    make defconfig
+
+	 # Reset Busybox for a new version
+	 make distclean
+	 # Configure Busybox
+	 make defconfig
 else
     cd busybox
 fi
 
-# TODO: Make and install busybox
+# Build Busybox
 make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
-make CONFIG_PREFIX=${OUTDIR}/rootfs ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} install
+# Install Busybox in rootfs folder
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} CONFIG_PREFIX=${OUTDIR}/rootfs install
+
+cd "${OUTDIR}/rootfs"
 
 echo "Library dependencies"
-cd "$OUTDIR/rootfs"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "Shared library"
 
-# TODO: Add library dependencies to rootfs
-export SYSROOT=$(aarch64-none-linux-gnu-gcc -print-sysroot)
-cp -a $SYSROOT/lib/ld-linux-aarch64.so.1 $OUTDIR/rootfs/lib
-cp -a $SYSROOT/lib64/ld-2.31.so $OUTDIR/rootfs/lib64
-cp -a $SYSROOT/lib64/libm.so.6 $OUTDIR/rootfs/lib64
-cp -a $SYSROOT/lib64/libresolv.so.2 $OUTDIR/rootfs/lib64
-cp -a $SYSROOT/lib64/libc.so.6 $OUTDIR/rootfs/lib64
-cp -a $SYSROOT/lib64/libm-2.31.so $OUTDIR/rootfs/lib64
-cp -a $SYSROOT/lib64/libresolv-2.31.so $OUTDIR/rootfs/lib64
-cp -a $SYSROOT/lib64/libc-2.31.so $OUTDIR/rootfs/lib64
+# Add library dependencies to rootfs
+CROSS_READ_ELF_PATH=$(type -aP ${CROSS_COMPILE}readelf)
+CROSS_READ_ELF_DIR=$(dirname ${CROSS_READ_ELF_PATH})
+CROSS_COMPILER_DIR=$(realpath ${CROSS_READ_ELF_DIR}/../${CROSS_COMPILER})
+cp -d ${CROSS_COMPILER_DIR}/libc/lib/ld-linux-aarch64.so.[*0-9] lib
+cp ${CROSS_COMPILER_DIR}/libc/lib64/ld-*.so lib64
+cp -d ${CROSS_COMPILER_DIR}/libc/lib64/libm.so.[*0-9] lib64
+cp ${CROSS_COMPILER_DIR}/libc/lib64/libm-*.so lib64
+cp -d ${CROSS_COMPILER_DIR}/libc/lib64/libresolv.so.[*0-9] lib64
+cp ${CROSS_COMPILER_DIR}/libc/lib64/libresolv-*.so lib64
+cp -d ${CROSS_COMPILER_DIR}/libc/lib64/libc.so.[*0-9] lib64
+cp ${CROSS_COMPILER_DIR}/libc/lib64/libc-*.so lib64
 
-# TODO: Make device nodes
-cd "$OUTDIR/rootfs"
+# Make device nodes
 sudo mknod -m 666 dev/null c 1 3
 sudo mknod -m 666 dev/console c 5 1
 
-# TODO: Clean and build the writer utility
-cd "$FINDER_APP_DIR"
+# Clean and build the writer utility
+cd ${FINDER_APP_DIR}
+echo "Removing the old writer utility and cross-compiling"
 make clean
-make CROSS_COMPILE=${CROSS_COMPILE}
-# TODO: Copy the finder related scripts and executables to the /home directory
-# on the target rootfs
-cp -a ${FINDER_APP_DIR}/writer ${OUTDIR}/rootfs/home
-cp -a ${FINDER_APP_DIR}/autorun-qemu.sh ${OUTDIR}/rootfs/home
-cp -a ${FINDER_APP_DIR}/finder.sh ${OUTDIR}/rootfs/home
-cp -a ${FINDER_APP_DIR}/finder-test.sh ${OUTDIR}/rootfs/home
-mkdir ${OUTDIR}/rootfs/home/conf
-cp -a ${FINDER_APP_DIR}/conf/username.txt ${OUTDIR}/rootfs/home/conf/username.txt
-cp -a ${FINDER_APP_DIR}/conf/assignment.txt ${OUTDIR}/rootfs/home/conf/assignment.txt
-# TODO: Chown the root directory
-cd "$OUTDIR/rootfs"
-sudo chown -R root:root *
-# TODO: Create initramfs.cpio.gz
-cd "$OUTDIR/rootfs"
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
+
+# Copy the finder related scripts and executables to the /home directory
+cp writer ${OUTDIR}/rootfs/home
+cp finder.sh ${OUTDIR}/rootfs/home
+cp finder-test.sh ${OUTDIR}/rootfs/home
+cp autorun-qemu.sh ${OUTDIR}/rootfs/home
+mkdir -p ${OUTDIR}/rootfs/conf
+cp conf/assignment.txt ${OUTDIR}/rootfs/conf
+cp conf/username.txt ${OUTDIR}/rootfs/conf
+cd ${OUTDIR}/rootfs/home
+ln -s ../conf conf
+
+# Chown the root directory
+sudo chown root:root ${OUTDIR}/rootfs
+echo 'root:x:0:' > ${OUTDIR}/rootfs/etc/group
+echo 'root:x:0:0:root:/root:/bin/sh' > ${OUTDIR}/rootfs/etc/passwd
+
+cd "${OUTDIR}/rootfs"
 find . | cpio -H newc -ov --owner root:root > ${OUTDIR}/initramfs.cpio
-cd "$OUTDIR"
+
+# Create initramfs.cpio.gz
+cd ..
 gzip -f initramfs.cpio
-mkimage -A arm -O linux -T ramdisk -d initramfs.cpio.gz uRamdisk

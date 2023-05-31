@@ -14,13 +14,8 @@
 */
 void test_validate_my_username()
 {
-    /**
-     * TODO: Replace the line below with your code here as described above to verify your /conf/username.txt 
-     * config file and my_username() functions are setup properly
-     */
-    const char *username_var;
-    const char *comparend;
-    username_var = my_username();
-    comparend = malloc_username_from_conf_file();
-    TEST_ASSERT_EQUAL_STRING_MESSAGE(username_var, comparend, "Message");
+    const char *my_usrname = my_username();
+    const char *conf_usrname = malloc_username_from_conf_file();
+    
+    TEST_ASSERT_EQUAL_STRING_MESSAGE(my_usrname, conf_usrname, "Verify conf_file user name");
 }

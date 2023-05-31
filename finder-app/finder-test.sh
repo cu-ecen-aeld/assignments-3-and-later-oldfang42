@@ -8,20 +8,14 @@ set -u
 NUMFILES=10
 WRITESTR=AELD_IS_FUN
 WRITEDIR=/tmp/aeld-data
-OUTPUTDIR=/tmp/assignment4-result.txt
-
-cd "/etc/finder-app/conf"
-username=$(cat username.txt)
+username=$(cat conf/username.txt)
 
 if [ $# -lt 3 ]
 then
-	# echo the following to the OUTPUTDIR
 	echo "Using default value ${WRITESTR} for string to write"
-	echo "Using default value ${WRITESTR} for string to write" > ${OUTPUTDIR}
 	if [ $# -lt 1 ]
 	then
 		echo "Using default value ${NUMFILES} for number of files to write"
-		echo "Using default value ${NUMFILES} for number of files to write" > ${OUTPUTDIR}
 	else
 		NUMFILES=$1
 	fi	
@@ -38,8 +32,7 @@ echo "Writing ${NUMFILES} files containing string ${WRITESTR} to ${WRITEDIR}"
 rm -rf "${WRITEDIR}"
 
 # create $WRITEDIR if not assignment1
-cd "/etc/finder-app/conf"
-assignment=`cat assignment.txt`
+assignment=`cat ../conf/assignment.txt`
 
 if [ $assignment != 'assignment1' ]
 then
@@ -51,18 +44,17 @@ then
 	if [ -d "$WRITEDIR" ]
 	then
 		echo "$WRITEDIR created"
-		echo "$WRITEDIR created" > ${OUTPUTDIR}
 	else
 		exit 1
 	fi
 fi
-
-echo "Removing the old writer utility and compiling as a native application"
-echo "Removing the old writer utility and compiling as a native application" > ${OUTPUTDIR}
+#echo "Removing the old writer utility and compiling as a native application"
+#make clean
+#make
 
 for i in $( seq 1 $NUMFILES)
 do
-    ./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
+	./writer "$WRITEDIR/${username}$i.txt" "$WRITESTR"
 done
 
 OUTPUTSTRING=$(./finder.sh "$WRITEDIR" "$WRITESTR")
@@ -74,10 +66,8 @@ set +e
 echo ${OUTPUTSTRING} | grep "${MATCHSTR}"
 if [ $? -eq 0 ]; then
 	echo "success"
-	echo "success" > ${OUTPUTDIR}
 	exit 0
 else
 	echo "failed: expected  ${MATCHSTR} in ${OUTPUTSTRING} but instead found"
-	echo "failed: expected  ${MATCHSTR} in ${OUTPUTSTRING} but instead found" > ${OUTPUTDIR}
 	exit 1
 fi

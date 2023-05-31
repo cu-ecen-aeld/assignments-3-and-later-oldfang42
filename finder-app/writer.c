@@ -1,36 +1,40 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <syslog.h>
 
-int main(int argc, char *argv[]) {
+int main (int argc, char *argv[]) {
 
-    // if no parameters are supplied, exit with error 1
-    if (argc < 3) {
-        syslog(LOG_ERR, "no parameters supplied");
-        // print statement to console
-        printf("no parameters supplied\n");
-        exit(1);
-    }
+   // Initialize connection with syslog
+   openlog("assignement2", LOG_PID | LOG_CONS, LOG_USER);
 
-    FILE *file = fopen(argv[1], "w");
-    char *str = argv[2];
-    openlog("writer.c", LOG_PID, LOG_USER);
-    syslog(LOG_DEBUG, "writing %s to %s", str, argv[1]);
-    // print statement to console
-    printf("writing %s to %s\n", str, argv[1]);
-    fprintf(file, "%s", str);
-    fclose(file);
-    
-    // if file is null or str is null, exit with error 1
-    if (file == NULL || str == NULL) {
-        syslog(LOG_ERR, "error opening %s", argv[1]);
-        // print statement to console
-        printf("error opening %s\n", argv[1]);
-        exit(1);
-    }
+   if (argc != 3) {
+      // Exit when less or more then 2 parameters are passed
+      // Note: executable name is first argv item
+      syslog(LOG_ERR, "Invalid number of parameters");
+      return 1;
+   }
 
-    closelog();
+   // Create dynamic log message
+   char buffer[100];
+   sprintf(buffer, "Writing %s to %s", argv[2], argv[1]);
 
-    return 0;
+   // Write log message to syslog
+   syslog(LOG_DEBUG, buffer);
+
+   // Create and open file for writing
+   FILE* writer_file = fopen (argv[1], "w");
+   if (writer_file == NULL)
+   {
+      // Exit when file could not be opened
+      syslog(LOG_ERR, "Could not open file for writing");
+      return 1;
+   }
+
+   // Write second parameter to file
+   fprintf(writer_file, argv[2]);
+
+   // Gracefully flose file
+   fclose(writer_file);
+
+   // return success
+   return 0;
 }
